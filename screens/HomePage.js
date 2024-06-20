@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Image, TextInput, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MagnifyingGlassIcon, XMarkIcon } from 'react-native-heroicons/outline';
 import { CalendarDaysIcon, MapPinIcon } from 'react-native-heroicons/solid';
@@ -10,6 +10,7 @@ import * as Progress from 'react-native-progress';
 import { StatusBar } from 'expo-status-bar';
 import { weatherImages } from '../constants';
 import { getData, storeData } from '../utils/asyncStorage';
+import DisplayTime from './components/DisplayTime'; 
 
 export default function HomePage() {
   const [showSearch, toggleSearch] = useState(false);
@@ -17,13 +18,16 @@ export default function HomePage() {
   const [loading, setLoading] = useState(true);
   const [weather, setWeather] = useState({});
 
-  const handleSearch = search => {
-    if (search && search.length > 2) {
-      fetchLocations({ cityName: search }).then(data => {
-        setLocations(data);
-      });
-    }
-  };
+  const handleSearch = useCallback(
+    debounce((search) => {
+      if (search && search.length > 2) {
+        fetchLocations({ cityName: search }).then(data => {
+          setLocations(data);
+        });
+      }
+    }, 1200),
+    []
+  );
 
   const handleLocation = loc => {
     setLoading(true);
@@ -43,7 +47,7 @@ export default function HomePage() {
     fetchMyWeatherData();
   }, []);
 
-  const fetchMyWeatherData = async () => {
+  const fetchMyWeatherData = useCallback(async () => {
     let myCity = await getData('city');
     let cityName = 'Ufa';
     if (myCity) {
@@ -56,7 +60,7 @@ export default function HomePage() {
       setWeather(data);
       setLoading(false);
     });
-  };
+  }, []);
 
   const handleTextDebounce = useCallback(debounce(handleSearch, 1200), []);
 
@@ -126,6 +130,10 @@ export default function HomePage() {
               </View>
             ) : null}
           </View>
+          
+          {/* Добавляем компонент DisplayTime */}
+          {Platform.OS === 'ios' && <DisplayTime />}
+          
           <View style={{ marginHorizontal: 4, flex: 1, justifyContent: 'space-around', marginBottom: 2 }}>
             <Text style={{ color: 'white', textAlign: 'center', fontSize: 24, fontWeight: 'bold' }}>
               {location?.name},
@@ -162,13 +170,13 @@ export default function HomePage() {
           <View style={{ marginBottom: 2, marginHorizontal: 5, justifyContent: 'space-between', flex: 1 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 5, marginBottom: 2 }}>
               <CalendarDaysIcon size={22} color="white" />
-              <Text style={{ color: 'white', fontSize: 16 }}>На неделю</Text>
+              <Text style={{ color: 'white', marginLeft: 2, fontSize: 16 }}>Daily forecast</Text>
             </View>
             <ScrollView horizontal contentContainerStyle={{ paddingHorizontal: 15 }} showsHorizontalScrollIndicator={false}>
               {weather?.forecast?.forecastday?.map((item, index) => {
                 const date = new Date(item.date);
-                const options = { weekday: 'long' };
-                let dayName = date.toLocaleDateString('ru-Ru', options);
+                const options = { weekday: 'short' };
+                let dayName = date.toLocaleDateString('en-US', options);
                 dayName = dayName.split(',')[0];
 
                 return (
@@ -178,18 +186,16 @@ export default function HomePage() {
                       justifyContent: 'center',
                       alignItems: 'center',
                       width: 100,
-                      borderRadius: 20,
-                      paddingVertical: 10,
-                      paddingHorizontal: 5,
+                      paddingVertical: 4,
+                      borderRadius: 10,
+                      marginRight: 16,
                       backgroundColor: theme.bgWhite(0.15),
-                      marginRight: 4,
                     }}>
-                    <Image
-                      source={weatherImages[item?.day?.condition?.text || 'other']}
-                      style={{ width: 40, height: 40 }}
-                    />
+                    <Image source={weatherImages[item?.day?.condition?.text || 'other']} style={{ width: 44, height: 44 }} />
                     <Text style={{ color: 'white' }}>{dayName}</Text>
-                    <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>{item?.day?.avgtemp_c}&#176;</Text>
+                    <Text style={{ color: 'white', fontSize: 16, fontWeight: 'bold' }}>
+                      {item?.day?.avgtemp_c}&#176;
+                    </Text>
                   </View>
                 );
               })}
